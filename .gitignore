@@ -1,0 +1,4 @@
+# Ignore any sort of media files that might be lying around in the folder
+*.mp4
+*.png
+*.pdf
