@@ -4,35 +4,35 @@
 # @Last Modified by:   radiantly
 # @Last Modified time: 2020-08-20 19:54:57
 
+import os
 import sys
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
 
 from PIL import Image
 import imagehash
 import cv2
 
-CHECK_PER_FRAMES = 30  # check per 30 frames (i.e. 1 frame per sec for 30 fps video)
+CHECK_PER_FRAMES = 45  # check per 30 frames (i.e. 1 frame per sec for 30 fps video)
 DIFF_THRESHOLD = 3
 
 
-def extractSlides(videoPath):
-    print(f"Reading {videoPath.as_posix()}...")
+def extractSlides(args):
+    videoPath, currentWorker, totalWorkers = args
     cap = cv2.VideoCapture(videoPath.as_posix())
     totalFrames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    startFrame = totalFrames * currentWorker // totalWorkers
+    endFrame = totalFrames * (currentWorker + 1) // totalWorkers
+    currentFrame = startFrame
 
+    cap.set(cv2.CAP_PROP_POS_FRAMES, startFrame)
     success, cv2_im = cap.read()
 
     slides = []
-    frameCount = 1
     prev_im_hash = None
     imageChanged = False
 
-    while success:
-        print(
-            f"[{frameCount}/{totalFrames}] {len(slides)} slide{'s' if len(slides) != 1 else ''} found.\r",
-            end="",
-        )
-
+    while success and currentFrame < endFrame:
         cv2_im = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
         pil_im = Image.fromarray(cv2_im)
 
@@ -41,7 +41,6 @@ def extractSlides(videoPath):
         im_hash = imagehash.phash(pil_im)
 
         if imageChanged and im_hash - prev_im_hash < DIFF_THRESHOLD:
-            # pil_im.save("frame{}.png".format(str(frameCount).zfill(3)), dpi=(72, 72))
             slides.append(pil_im)
             imageChanged = False
 
@@ -50,11 +49,37 @@ def extractSlides(videoPath):
 
         for i in range(CHECK_PER_FRAMES):  # skip frames
             success, cv2_im = cap.read()
-        frameCount += CHECK_PER_FRAMES
+
+        currentFrame += CHECK_PER_FRAMES
+    cap.release()
+    return slides
+
+
+def slideManager(videoPath):
+    workers = os.cpu_count()
+
+    print(f"Reading {videoPath.as_posix()} with {workers} workers...")
+
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        # lastSlide = None
+        allSlides = []
+        for slides in executor.map(
+            extractSlides, [(videoPath, i, workers) for i in range(workers)]
+        ):
+            if not slides:
+                continue
+            if (
+                allSlides
+                and imagehash.phash(allSlides[-1]) - imagehash.phash(slides[0]) < DIFF_THRESHOLD
+            ):
+                slides = slides[1:]
+            allSlides.extend(slides)
 
     pdfFileName = input("Enter a name for the pdf file: ")
     saveLocation = Path.cwd() / f"{pdfFileName}.pdf"
-    slides[0].save(saveLocation, "PDF", resolution=100.0, save_all=True, append_images=slides[1:])
+    allSlides[0].save(
+        saveLocation, "PDF", resolution=100.0, save_all=True, append_images=allSlides[1:]
+    )
 
 
 def main():
@@ -68,11 +93,10 @@ def main():
 
     if basePath.is_dir():
         for videoPath in [path for path in basePath.rglob("*") if path.suffix in [".mp4", ".mkv"]]:
-            extractSlides(videoPath)
+            slideManager(videoPath)
     else:
-        extractSlides(basePath)
+        slideManager(basePath)
 
 
 if __name__ == "__main__":
     main()
-
