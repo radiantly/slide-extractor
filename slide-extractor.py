@@ -40,9 +40,34 @@ def extractSlides(videoPath):
         if imageDiff > DIFF_THRESHOLD:
             imageChanged = True
 
-    pdfFileName = input("Enter a name for the pdf file: ")
-    saveLocation = Path.cwd() / f"{pdfFileName}.pdf"
-    slides[0].save(saveLocation, "PDF", resolution=100.0, save_all=True, append_images=slides[1:])
+    return slides
+
+
+def slideManager(videoPaths):
+    savedPdfs = []
+    for videoPath in videoPaths:
+        slides = extractSlides(videoPath)
+        if not slides:
+            continue
+        pdfFileName = f"{videoPath.stem}.pdf"
+        slides[0].save(
+            pdfFileName, "PDF", resolution=100.0, save_all=True, append_images=slides[1:],
+        )
+        savedPdfs.append(pdfFileName)
+        print(f"Successfully saved {pdfFileName}")
+    return savedPdfs
+
+
+def renamePdfs(pdfNames):
+    pdfPaths = [Path(pdfName) for pdfName in pdfNames if Path(pdfName).exists()]
+    if not pdfPaths:
+        return
+    print("\nPress [ENTER] to leave as is and [CTRL+C] to exit.")
+    for pdfPath in pdfPaths:
+        newName = input(f"New name for {pdfPath.name}: ").replace(".pdf", "")
+        if not newName.strip():
+            continue
+        pdfPath.rename(f"{newName}.pdf")
 
 
 def main():
@@ -54,11 +79,13 @@ def main():
     if not basePath.exists():
         raise Exception(f"Cannot find {basePath.as_posix()}")
 
-    if basePath.is_dir():
-        for videoPath in [path for path in basePath.rglob("*") if path.suffix in [".mp4"]]:
-            extractSlides(videoPath)
-    else:
-        extractSlides(basePath)
+    savedPdfs = slideManager(
+        [path for path in basePath.rglob("*") if path.suffix in [".mp4"]]
+        if basePath.is_dir()  # if directory, process all mp4 videos in it. Else use basepath as videopath.
+        else [basePath]
+    )
+
+    renamePdfs(savedPdfs)
 
 
 if __name__ == "__main__":
