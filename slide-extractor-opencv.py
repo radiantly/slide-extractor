@@ -29,7 +29,7 @@ def extractSlides(videoPath):
 
     while success:
         print(
-            f"[{frameCount}/{totalFrames}] {len(slides)} slide{'s' if len(slides) != 1 else ''} found.",
+            f"[{frameCount}/{totalFrames}] {len(slides)} slide{'s' if len(slides) != 1 else ''} found.\r",
             end="",
         )
 
@@ -39,7 +39,6 @@ def extractSlides(videoPath):
         # compare current frame to previous frame, save frame if sufficiently different
         prev_im_hash = imagehash.phash(pil_im) if not prev_im_hash else im_hash
         im_hash = imagehash.phash(pil_im)
-        # print(im_hash - prev_im_hash)
 
         if imageChanged and im_hash - prev_im_hash < DIFF_THRESHOLD:
             # pil_im.save("frame{}.png".format(str(frameCount).zfill(3)), dpi=(72, 72))
@@ -76,4 +75,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
