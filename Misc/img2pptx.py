@@ -54,9 +54,14 @@ def makePresentation(images: list, saveDirectory: Path):
 
 def main():
     if len(sys.argv) != 2:
-        raise Exception(f"Syntax: {sys.argv[0]} IMAGES_FOLDER_PATH")
+        from tkinter import Tk, filedialog
 
-    imagesFolderPath = Path(sys.argv[1])
+        Tk().withdraw()
+        print("Select folder with images ..")
+        imagesFolderPath = Path(filedialog.askdirectory())
+    else:
+        imagesFolderPath = Path(sys.argv[1])
+
     if not imagesFolderPath.exists():
         raise Exception(f"Folder {imagesFolderPath.as_posix()} does not exist")
 
