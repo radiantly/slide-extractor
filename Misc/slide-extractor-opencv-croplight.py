@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# @Author: johan
-# @Date:   2019-02-15 01:47:00
-# @Last Modified by:   radiantly
-# @Last Modified time: 2020-08-20 19:54:57
-
 import sys
 from pathlib import Path
 
@@ -11,10 +5,10 @@ from PIL import Image, ImageStat
 import imagehash
 import cv2
 
-DIFF_THRESHOLD = 5
+from cropPdf import getCropCoords
 
-# Use https://yangcha.github.io/iview/iview.html to find the cropping coorfinates.
-crop_box = crop_left, crop_top, crop_right, crop_bottom = 390, 60, 1490, 800
+
+DIFF_THRESHOLD = 5
 
 
 def extractSlides(videoPath):
@@ -38,29 +32,33 @@ def extractSlides(videoPath):
         )
 
         cv2_im = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
-        pil_im = Image.fromarray(cv2_im).crop(crop_box)
+        pil_im = Image.fromarray(cv2_im)
 
-        # compare current frame to previous frame, save frame if sufficiently different
-        prev_im_hash = imagehash.phash(pil_im) if not prev_im_hash else im_hash
-        im_hash = imagehash.phash(pil_im)
+        if ImageStat.Stat(pil_im.convert("L")).mean[0] > 150:
+            crop_box = getCropCoords(pil_im)
+            pil_im = pil_im.crop(crop_box)
 
-        # Only add slide if
-        if (
-            imageChanged  # Slide change has been detected
-            and im_hash - prev_im_hash < DIFF_THRESHOLD  # This frame is the same as the last
-            and all(
-                im_hash - slideHash > DIFF_THRESHOLD for slideHash in slideHashes
-            )  # Slide has not already been added to list
-            and ImageStat.Stat(pil_im.convert("L")).mean[0]
-            > 150  # Slide must be sufficiently bright
-        ):
-            # pil_im.save("frame{}.png".format(str(frameCount).zfill(3)), dpi=(72, 72))
-            slides.append(pil_im)
-            slideHashes.append(im_hash)
-            imageChanged = False
+            # compare current frame to previous frame, save frame if sufficiently different
+            prev_im_hash = imagehash.phash(pil_im) if not prev_im_hash else im_hash
+            im_hash = imagehash.phash(pil_im)
 
-        if im_hash - prev_im_hash > DIFF_THRESHOLD:
-            imageChanged = True
+            # Only add slide if
+            if (
+                imageChanged  # Slide change has been detected
+                and im_hash - prev_im_hash < DIFF_THRESHOLD  # This frame is the same as the last
+                and all(
+                    im_hash - slideHash > DIFF_THRESHOLD for slideHash in slideHashes
+                )  # Slide has not already been added to list
+                and ImageStat.Stat(pil_im.convert("L")).mean[0]
+                > 150  # Slide must be sufficiently bright
+            ):
+                # pil_im.save("frame{}.png".format(str(frameCount).zfill(3)), dpi=(72, 72))
+                slides.append(pil_im)
+                slideHashes.append(im_hash)
+                imageChanged = False
+
+            if im_hash - prev_im_hash > DIFF_THRESHOLD:
+                imageChanged = True
 
         for i in range(CHECK_PER_FRAMES):  # skip frames
             success, cv2_im = cap.read()

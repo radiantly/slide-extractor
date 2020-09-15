@@ -4,3 +4,9 @@
 *.jpeg
 *.pdf
 *.pptx
+
+# Virtual env
+slide-venv
+
+# Pycache
+__pycache__
