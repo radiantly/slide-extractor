@@ -12,7 +12,6 @@ import imagehash
 from tqdm import trange
 from decord import VideoReader, cpu
 
-CHECK_PER_FRAMES = 30  # check per 30 frames (i.e. 1 frame per sec for 30 fps video)
 DIFF_THRESHOLD = 3
 
 
@@ -20,13 +19,15 @@ def extractSlides(videoPath):
     print(f"Reading {videoPath.as_posix()}...")
 
     vr = VideoReader(videoPath.as_posix(), ctx=cpu(0))
+    fps = vr.get_avg_fps()
+    print(f"Successfully read. FPS: {fps}")
 
     slides = []
     frameCount = 1
     prevImageHash = None
     imageChanged = False
 
-    for i in trange(0, len(vr), CHECK_PER_FRAMES):
+    for i in trange(0, len(vr), int(fps)):
         frame = vr[i].asnumpy()
         pilImage = Image.fromarray(frame)
         prevImageHash = imagehash.average_hash(pilImage) if not prevImageHash else currentImageHash
@@ -51,7 +52,11 @@ def slideManager(videoPaths):
             continue
         pdfFileName = f"{videoPath.stem}.pdf"
         slides[0].save(
-            pdfFileName, "PDF", resolution=100.0, save_all=True, append_images=slides[1:],
+            pdfFileName,
+            "PDF",
+            resolution=100.0,
+            save_all=True,
+            append_images=slides[1:],
         )
         savedPdfs.append(pdfFileName)
         print(f"Successfully saved {pdfFileName}")
@@ -90,4 +95,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
